@@ -157,7 +157,7 @@ export default function Practice({ config, onBack }: { config: PracticeConfig; o
             ? JSON.parse(problem.question_image!)
             : [problem.question_image!];
           return <>{imgs.map((src, i) => (
-            <img key={i} src={`/${src}`} alt="Zadání" className="w-full" draggable={false} />
+            <img key={i} src={`${import.meta.env.BASE_URL}${src}`} alt="Zadání" className="w-full" draggable={false} />
           ))}</>;
         })() : (
           <div className="p-6">
@@ -250,7 +250,7 @@ export default function Practice({ config, onBack }: { config: PracticeConfig; o
                     <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide px-4 pt-3 pb-1">
                       Správné řešení
                     </p>
-                    <img src={`/${problem.answer_image}`} alt="Správné řešení" className="w-full" draggable={false} />
+                    <img src={`${import.meta.env.BASE_URL}${problem.answer_image}`} alt="Správné řešení" className="w-full" draggable={false} />
                   </div>
                 ) : (
                   <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl px-4 py-3 flex items-baseline gap-3">
