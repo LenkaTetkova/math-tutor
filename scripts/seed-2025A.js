@@ -4,7 +4,7 @@
  * Crops pages using ImageMagick where multiple problems share a page.
  */
 import { execSync } from 'child_process';
-import { mkdirSync, existsSync } from 'fs';
+import { mkdirSync, existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { openDb, initDb } from '../server/db/schema.js';
@@ -28,6 +28,48 @@ function full(srcFile, destName) {
   return crop(path.join(SRC, srcFile), destName, 0, 0, W, 2339);
 }
 
+/**
+ * findSplitRows(imagePath) → sorted array of y-coordinates where horizontal
+ * separator lines appear. Works by reading raw PPM pixel data and counting
+ * dark pixels per row; rows where >60% of pixels are dark (value < 80)
+ * are flagged as separator candidates and deduplicated.
+ *
+ * Use this to find split points on pages with multiple problems, instead of
+ * guessing crop values manually.
+ */
+function findSplitRows(imagePath) {
+  // Convert to PPM (raw RGB) so we can parse without extra deps
+  const ppm = execSync(`convert "${imagePath}" -colorspace Gray ppm:-`);
+  // PPM header: "P6\n<W> <H>\n<maxval>\n" followed by raw bytes
+  // For grayscale we use -colorspace Gray so each pixel = 3 identical bytes (still P6)
+  let offset = 0;
+  // skip magic
+  while (ppm[offset] !== 0x0a) offset++; offset++;
+  // read W H
+  let dims = '';
+  while (ppm[offset] !== 0x0a) dims += String.fromCharCode(ppm[offset++]); offset++;
+  const [imgW, imgH] = dims.trim().split(' ').map(Number);
+  // skip maxval line
+  while (ppm[offset] !== 0x0a) offset++; offset++;
+
+  const threshold = Math.floor(imgW * 0.60); // >60% dark pixels = separator
+  const splits = [];
+  for (let y = 0; y < imgH; y++) {
+    let dark = 0;
+    for (let x = 0; x < imgW; x++) {
+      if (ppm[offset + x * 3] < 80) dark++;
+    }
+    offset += imgW * 3;
+    if (dark > threshold) splits.push(y);
+  }
+  // Deduplicate: keep first row of each consecutive run
+  const result = [];
+  for (let i = 0; i < splits.length; i++) {
+    if (i === 0 || splits[i] - splits[i - 1] > 5) result.push(splits[i]);
+  }
+  return result;
+}
+
 // ── define crops (1654×2339 pages) ────────────────────────────────────────
 // test-02: top = prob 1, middle = prob 2, bottom = start of prob 3 (header + 3.1)
 const p1_img  = crop(`${SRC}/test-02.png`, '2025-A-01.png', 0,    0, W,  750);
@@ -48,12 +90,13 @@ const p8_img  = full('test-06.png', '2025-A-08.png');
 const p9_img  = full('test-07.png', '2025-A-09.png');
 // test-08: prob 10 (construction, full)
 const p10_img = full('test-08.png', '2025-A-10.png');
-// test-09: top = prob 11 (3D shapes), bottom = prob 12 (pool)
-const p11_img = crop(`${SRC}/test-09.png`, '2025-A-11.png', 0,    0, W, 1300);
-const p12_img = crop(`${SRC}/test-09.png`, '2025-A-12.png', 0, 1250, W, 1089);
-// test-10: top = prob 13, bottom = prob 14
-const p13_img = crop(`${SRC}/test-10.png`, '2025-A-13.png', 0,    0, W, 1200);
-const p14_img = crop(`${SRC}/test-10.png`, '2025-A-14.png', 0, 1180, W, 1159);
+// test-09: separator line detected at y=1116 (findSplitRows)
+// prob 11 = above separator, prob 12 = separator + VÝCHOZÍ TEXT header + content
+const p11_img = crop(`${SRC}/test-09.png`, '2025-A-11.png', 0,    0, W, 1112);
+const p12_img = crop(`${SRC}/test-09.png`, '2025-A-12.png', 0, 1112, W, 1227);
+// test-10: separator line detected at y=1061 (findSplitRows)
+const p13_img = crop(`${SRC}/test-10.png`, '2025-A-13.png', 0,    0, W, 1057);
+const p14_img = crop(`${SRC}/test-10.png`, '2025-A-14.png', 0, 1057, W, 1282);
 // test-11: prob 15 (full)
 const p15_img = full('test-11.png', '2025-A-15.png');
 // test-12: prob 16 (crop before formula sheet at bottom)
