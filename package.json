@@ -7,7 +7,7 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "node --watch server/index.js",
     "client": "vite",
-    "build": "node scripts/export-static.js && vite build",
+    "build": "vite build",
     "export": "node scripts/export-static.js",
     "extract": "node scripts/extract-problems.js",
     "download": "node scripts/download-pdfs.js"
