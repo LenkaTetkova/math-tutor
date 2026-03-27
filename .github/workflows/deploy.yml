@@ -25,17 +25,17 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: npm
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
       - run: npm ci
 
       - name: Build
         run: npm run build
-        # npm run build = export-static (JSON) + vite build
-        # Images are included via public/data/images symlink
 
-      - uses: actions/configure-pages@v4
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
