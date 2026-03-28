@@ -84,8 +84,8 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
 
   // Open / reveal state
   const [revealedParts, setRevealedParts] = useState<Set<number>>(new Set());
-  // null = not yet assessed, true/false = self-assessed result
-  const [selfAssessed, setSelfAssessed] = useState<boolean | null>(null);
+  // partIndex → true/false self-assessment
+  const [selfAssessments, setSelfAssessments] = useState<Record<number, boolean>>({});
 
   const [showHint, setShowHint] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
@@ -95,7 +95,7 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
     setMcResult(null);
     setMcSelections({});
     setRevealedParts(new Set());
-    setSelfAssessed(null);
+    setSelfAssessments({});
     setShowHint(false);
     setShowSolution(false);
   }
@@ -185,12 +185,11 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
   const singleMC = isSingleMC(problem);
   const multiMC = isMultiMC(problem);
 
-  const openAnswered = !singleMC && !multiMC && revealedParts.size >= answerParts.length;
   const allRevealed = singleMC
     ? !!mcResult
     : multiMC
       ? Object.keys(mcSelections).length >= answerParts.length
-      : openAnswered && selfAssessed !== null;
+      : Object.keys(selfAssessments).length >= answerParts.length;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 min-h-screen flex flex-col">
@@ -347,56 +346,88 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
 
       {/* ── Open / per-part reveal ── */}
       {!singleMC && !multiMC && (
-        <div className="space-y-2 mb-5">
-          {answerParts.map((part, i) =>
-            revealedParts.has(i) ? (
-              <div key={i}>
+        <div className="space-y-3 mb-5">
+          {answerParts.map((part, i) => {
+            const revealed = revealedParts.has(i);
+            const assessed = i in selfAssessments;
+            const prevAssessed = i === 0 || (i - 1) in selfAssessments;
+
+            if (!revealed) {
+              return (
+                <button key={i} disabled={!prevAssessed}
+                  onClick={() => setRevealedParts(new Set([...revealedParts, i]))}
+                  className="w-full py-3 border-2 border-indigo-200 hover:border-indigo-400 bg-white
+                    text-indigo-600 font-medium rounded-xl transition-colors text-sm
+                    disabled:opacity-40 disabled:cursor-not-allowed">
+                  Zobrazit odpověď{part.label ? ` (${part.label})` : ''}
+                </button>
+              );
+            }
+
+            const partCorrect = selfAssessments[i];
+            const borderCls = !assessed
+              ? 'border-slate-200'
+              : partCorrect ? 'border-emerald-300' : 'border-rose-300';
+
+            return (
+              <div key={i} className={`rounded-xl border-2 overflow-hidden ${borderCls}`}>
+                {/* Answer */}
                 {problem.answer_image ? (
-                  <div className="rounded-2xl overflow-hidden border-2 border-emerald-300">
-                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide px-4 pt-3 pb-1">
-                      Správné řešení
+                  <>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide px-4 pt-3 pb-1">
+                      Správné řešení{part.label ? ` (${part.label})` : ''}
                     </p>
                     <img src={`${import.meta.env.BASE_URL}${problem.answer_image}`} alt="Správné řešení" className="w-full" draggable={false} />
-                  </div>
+                  </>
                 ) : (
-                  <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl px-4 py-3 flex items-baseline gap-3">
+                  <div className="px-4 py-3 flex items-baseline gap-3 bg-white">
                     {part.label && (
-                      <span className="text-xs font-bold text-emerald-600 shrink-0 w-8">{part.label}</span>
+                      <span className="text-xs font-bold text-slate-500 shrink-0 w-8">{part.label}</span>
                     )}
-                    <span className="text-emerald-900 font-bold">{part.value}</span>
+                    <span className="font-bold text-slate-800">{part.value}</span>
                   </div>
                 )}
-              </div>
-            ) : (
-              <button key={i}
-                onClick={() => setRevealedParts(new Set([...revealedParts, i]))}
-                className="w-full py-3 border-2 border-indigo-200 hover:border-indigo-400 bg-white
-                  text-indigo-600 font-medium rounded-xl transition-colors text-sm">
-                Zobrazit odpověď{part.label ? ` (${part.label})` : ''}
-              </button>
-            )
-          )}
-        </div>
-      )}
 
-      {/* ── Self-assessment (open-ended, all parts revealed) ── */}
-      {openAnswered && selfAssessed === null && (
-        <div className="mb-5">
-          <p className="text-xs text-slate-500 text-center mb-2">Měl/a jsi to správně?</p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => { saveAttempt(problem.id, false); setSelfAssessed(false); setRev(r => r + 1); }}
-              className="flex-1 py-3 border-2 border-rose-200 hover:border-rose-400 bg-white
-                text-rose-600 font-semibold rounded-xl transition-colors">
-              ✗ Neuměl/a
-            </button>
-            <button
-              onClick={() => { saveAttempt(problem.id, true); setSelfAssessed(true); setRev(r => r + 1); }}
-              className="flex-1 py-3 border-2 border-emerald-200 hover:border-emerald-400 bg-white
-                text-emerald-700 font-semibold rounded-xl transition-colors">
-              ✓ Uměl/a
-            </button>
-          </div>
+                {/* Self-assessment */}
+                {!assessed ? (
+                  <div className="flex gap-2 px-3 pb-3 pt-2 bg-white">
+                    <button
+                      onClick={() => {
+                        const updated = { ...selfAssessments, [i]: false };
+                        setSelfAssessments(updated);
+                        if (Object.keys(updated).length >= answerParts.length) {
+                          const allCorrect = answerParts.every((_, j) => updated[j] === true);
+                          saveAttempt(problem.id, allCorrect);
+                          setRev(r => r + 1);
+                        }
+                      }}
+                      className="flex-1 py-2 border-2 border-rose-200 hover:border-rose-400 bg-white
+                        text-rose-600 font-semibold rounded-lg text-sm transition-colors">
+                      ✗ Neuměl/a
+                    </button>
+                    <button
+                      onClick={() => {
+                        const updated = { ...selfAssessments, [i]: true };
+                        setSelfAssessments(updated);
+                        if (Object.keys(updated).length >= answerParts.length) {
+                          const allCorrect = answerParts.every((_, j) => updated[j] === true);
+                          saveAttempt(problem.id, allCorrect);
+                          setRev(r => r + 1);
+                        }
+                      }}
+                      className="flex-1 py-2 border-2 border-emerald-200 hover:border-emerald-400 bg-white
+                        text-emerald-700 font-semibold rounded-lg text-sm transition-colors">
+                      ✓ Uměl/a
+                    </button>
+                  </div>
+                ) : (
+                  <p className={`text-xs font-semibold px-4 py-2 ${partCorrect ? 'text-emerald-700 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                    {partCorrect ? '✓ Správně' : '✗ Špatně'}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
