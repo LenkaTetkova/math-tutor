@@ -1,4 +1,32 @@
 // localStorage-based attempt tracking (replaces /api/stats + /api/attempts)
+import type { PracticeConfig } from '../App';
+
+// ── Session persistence ────────────────────────────────────────────────────
+
+interface SessionState {
+  screen: 'home' | 'practice';
+  config: PracticeConfig;
+  idx: number; // only meaningful in exam mode
+}
+
+const SESSION_KEY = 'cermat_session';
+
+export function saveSession(state: SessionState) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(state));
+}
+
+export function loadSession(): SessionState | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+export function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+// ── Attempt tracking ───────────────────────────────────────────────────────
 
 interface Attempt {
   correct: boolean;

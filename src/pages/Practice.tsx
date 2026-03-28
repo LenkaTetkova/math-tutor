@@ -20,7 +20,12 @@ function isMultiMC(p: Problem) {
   return p.type === 'multiple_choice' && !!p.options && p.correct_answer.includes(' ; ');
 }
 
-export default function Practice({ config, onBack }: { config: PracticeConfig; onBack: () => void }) {
+export default function Practice({ config, startIdx, onBack, onProgress }: {
+  config: PracticeConfig;
+  startIdx: number;
+  onBack: () => void;
+  onProgress: (idx: number) => void;
+}) {
   const problems = useMemo<Problem[]>(() => {
     if (config.mode === 'exam') {
       return (allProblems as Problem[])
@@ -34,7 +39,7 @@ export default function Practice({ config, onBack }: { config: PracticeConfig; o
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.mode, config.examYear, config.examTerm, config.topic]);
 
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx] = useState(startIdx);
   const [done, setDone] = useState(false);
 
   // Single MC state
@@ -64,13 +69,20 @@ export default function Practice({ config, onBack }: { config: PracticeConfig; o
     if (idx + 1 >= problems.length) {
       setDone(true);
     } else {
-      setIdx(i => i + 1);
+      const next = idx + 1;
+      setIdx(next);
+      onProgress(next);
       reset();
     }
   }
 
   function goBack() {
-    if (idx > 0) { setIdx(i => i - 1); reset(); }
+    if (idx > 0) {
+      const prev = idx - 1;
+      setIdx(prev);
+      onProgress(prev);
+      reset();
+    }
   }
 
   function checkMC(option: string, problem: Problem) {
