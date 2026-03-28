@@ -84,6 +84,8 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
 
   // Open / reveal state
   const [revealedParts, setRevealedParts] = useState<Set<number>>(new Set());
+  // null = not yet assessed, true/false = self-assessed result
+  const [selfAssessed, setSelfAssessed] = useState<boolean | null>(null);
 
   const [showHint, setShowHint] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
@@ -93,6 +95,7 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
     setMcResult(null);
     setMcSelections({});
     setRevealedParts(new Set());
+    setSelfAssessed(null);
     setShowHint(false);
     setShowSolution(false);
   }
@@ -182,11 +185,12 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
   const singleMC = isSingleMC(problem);
   const multiMC = isMultiMC(problem);
 
+  const openAnswered = !singleMC && !multiMC && revealedParts.size >= answerParts.length;
   const allRevealed = singleMC
     ? !!mcResult
     : multiMC
       ? Object.keys(mcSelections).length >= answerParts.length
-      : revealedParts.size >= answerParts.length;
+      : openAnswered && selfAssessed !== null;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 min-h-screen flex flex-col">
@@ -365,20 +369,34 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
               </div>
             ) : (
               <button key={i}
-                onClick={() => {
-                  const next = new Set([...revealedParts, i]);
-                  setRevealedParts(next);
-                  if (next.size >= answerParts.length) {
-                    saveAttempt(problem.id, false);
-                    setRev(r => r + 1);
-                  }
-                }}
+                onClick={() => setRevealedParts(new Set([...revealedParts, i]))}
                 className="w-full py-3 border-2 border-indigo-200 hover:border-indigo-400 bg-white
                   text-indigo-600 font-medium rounded-xl transition-colors text-sm">
                 Zobrazit odpověď{part.label ? ` (${part.label})` : ''}
               </button>
             )
           )}
+        </div>
+      )}
+
+      {/* ── Self-assessment (open-ended, all parts revealed) ── */}
+      {openAnswered && selfAssessed === null && (
+        <div className="mb-5">
+          <p className="text-xs text-slate-500 text-center mb-2">Měl/a jsi to správně?</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => { saveAttempt(problem.id, false); setSelfAssessed(false); setRev(r => r + 1); }}
+              className="flex-1 py-3 border-2 border-rose-200 hover:border-rose-400 bg-white
+                text-rose-600 font-semibold rounded-xl transition-colors">
+              ✗ Neuměl/a
+            </button>
+            <button
+              onClick={() => { saveAttempt(problem.id, true); setSelfAssessed(true); setRev(r => r + 1); }}
+              className="flex-1 py-3 border-2 border-emerald-200 hover:border-emerald-400 bg-white
+                text-emerald-700 font-semibold rounded-xl transition-colors">
+              ✓ Uměl/a
+            </button>
+          </div>
         </div>
       )}
 
