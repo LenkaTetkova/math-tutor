@@ -47,6 +47,20 @@ export function saveAttempt(problemId: string, isCorrect: boolean) {
   localStorage.setItem('cermat_attempts', JSON.stringify(store));
 }
 
+export type AttemptStatus = 'correct' | 'wrong' | 'unseen';
+
+/** Returns a map of problemId → last-attempt status */
+export function getStatuses(problemIds: string[]): Record<string, AttemptStatus> {
+  const store = load();
+  const result: Record<string, AttemptStatus> = {};
+  for (const id of problemIds) {
+    const attempts = store[id] ?? [];
+    if (attempts.length === 0) result[id] = 'unseen';
+    else result[id] = attempts[attempts.length - 1].correct ? 'correct' : 'wrong';
+  }
+  return result;
+}
+
 export interface Stats {
   overall: { attempted: number; correct: number };
   byTopic: { topic: string; attempted: number; correct: number }[];

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Problem, TOPIC_LABELS, TOPIC_EMOJI } from '../types';
 import { PracticeConfig } from '../App';
 import allProblems from '../data/problems.json';
-import { saveAttempt } from '../lib/storage';
+import { saveAttempt, getStatuses, AttemptStatus } from '../lib/storage';
 
 function parseAnswer(answer: string): { label: string | null; value: string }[] {
   return answer.split(' ; ').map(part => {
@@ -20,24 +20,57 @@ function isMultiMC(p: Problem) {
   return p.type === 'multiple_choice' && !!p.options && p.correct_answer.includes(' ; ');
 }
 
+const STATUS_DOT: Record<AttemptStatus, string> = {
+  correct: 'bg-emerald-400',
+  wrong:   'bg-rose-400',
+  unseen:  'bg-slate-200',
+};
+
 export default function Practice({ config, startIdx, onBack, onProgress }: {
   config: PracticeConfig;
   startIdx: number;
   onBack: () => void;
   onProgress: (idx: number) => void;
 }) {
-  const problems = useMemo<Problem[]>(() => {
-    if (config.mode === 'exam') {
-      return (allProblems as Problem[])
-        .filter(p => p.year === config.examYear && p.term === config.examTerm)
-        .sort((a, b) => a.problem_number - b.problem_number);
-    }
+  // In topic mode: whether to show all problems or only unseen+wrong
+  const [showAll, setShowAll] = useState(false);
+
+  // Statuses are re-read from localStorage on each render so they stay fresh
+  // after answering a problem (saveAttempt writes to localStorage).
+  // We store a revision counter to force re-reads after saving.
+  const [rev, setRev] = useState(0);
+
+  const allTopicProblems = useMemo<Problem[]>(() => {
+    if (config.mode === 'exam') return [];
     const filtered = (allProblems as Problem[]).filter(
       p => !config.topic || p.topic === config.topic
     );
     return [...filtered].sort(() => Math.random() - 0.5);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.mode, config.examYear, config.examTerm, config.topic]);
+  }, [config.mode, config.topic]);
+
+  const examProblems = useMemo<Problem[]>(() => {
+    if (config.mode !== 'exam') return [];
+    return (allProblems as Problem[])
+      .filter(p => p.year === config.examYear && p.term === config.examTerm)
+      .sort((a, b) => a.problem_number - b.problem_number);
+  }, [config.mode, config.examYear, config.examTerm]);
+
+  // For topic mode, derive the active list based on showAll toggle
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const topicStatuses = useMemo(() => getStatuses(allTopicProblems.map(p => p.id)), [allTopicProblems, rev]);
+  const todoProblems = useMemo(
+    () => allTopicProblems.filter(p => topicStatuses[p.id] !== 'correct'),
+    [allTopicProblems, topicStatuses]
+  );
+
+  const problems: Problem[] = config.mode === 'exam'
+    ? examProblems
+    : (showAll ? allTopicProblems : (todoProblems.length > 0 ? todoProblems : allTopicProblems));
+
+  // Exam statuses for progress strip
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const examStatuses = useMemo(() => getStatuses(examProblems.map(p => p.id)), [examProblems, rev]);
 
   const [idx, setIdx] = useState(startIdx);
   const [done, setDone] = useState(false);
@@ -54,7 +87,6 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
 
   const [showHint, setShowHint] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
-
 
   function reset() {
     setSelected(null);
@@ -85,6 +117,12 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
     }
   }
 
+  function jumpTo(i: number) {
+    setIdx(i);
+    onProgress(i);
+    reset();
+  }
+
   function checkMC(option: string, problem: Problem) {
     setSelected(option);
     const correct = problem.correct_answer;
@@ -93,15 +131,16 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
       || option.startsWith(correct.charAt(0));
     setMcResult(isCorrect ? 'correct' : 'wrong');
     saveAttempt(problem.id, isCorrect);
+    setRev(r => r + 1);
   }
 
   function selectMultiMC(partIdx: number, option: string, problem: Problem, answerParts: {label:string|null;value:string}[]) {
     const updated = { ...mcSelections, [partIdx]: option };
     setMcSelections(updated);
-    // Save attempt once all parts answered
     if (Object.keys(updated).length >= answerParts.length) {
       const allCorrect = answerParts.every((p, i) => updated[i]?.charAt(0) === p.value);
       saveAttempt(problem.id, allCorrect);
+      setRev(r => r + 1);
     }
   }
 
@@ -135,7 +174,8 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
     );
   }
 
-  const problem = problems[idx];
+  const safeIdx = Math.min(idx, problems.length - 1);
+  const problem = problems[safeIdx];
   const steps: string[] = problem.solution_steps ? JSON.parse(problem.solution_steps) : [];
   const options: string[] = problem.options ? JSON.parse(problem.options) : [];
   const answerParts = parseAnswer(problem.correct_answer);
@@ -158,11 +198,52 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
           {TOPIC_EMOJI[problem.topic]} {TOPIC_LABELS[problem.topic]}
         </span>
         <span className="text-sm text-slate-400">
-        {config.mode === 'exam'
-          ? `Úloha ${problem.problem_number} / ${problems.length}`
-          : `${idx + 1} / ${problems.length}`}
-      </span>
+          {config.mode === 'exam'
+            ? `Úloha ${problem.problem_number} / ${problems.length}`
+            : `${safeIdx + 1} / ${problems.length}`}
+        </span>
       </div>
+
+      {/* ── Exam progress strip ── */}
+      {config.mode === 'exam' && (
+        <div className="flex flex-wrap gap-1.5 mb-4 justify-center">
+          {examProblems.map((p, i) => {
+            const status = examStatuses[p.id] ?? 'unseen';
+            const isCurrent = i === safeIdx;
+            return (
+              <button
+                key={p.id}
+                onClick={() => jumpTo(i)}
+                title={`Úloha ${p.problem_number}`}
+                className={`w-7 h-7 rounded-full text-xs font-bold transition-all
+                  ${STATUS_DOT[status]}
+                  ${isCurrent ? 'ring-2 ring-offset-1 ring-indigo-500 scale-110' : 'hover:scale-105'}
+                  ${status === 'unseen' ? 'text-slate-400' : 'text-white'}`}
+              >
+                {p.problem_number}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Topic mode: filter toggle ── */}
+      {config.mode === 'topic' && (
+        <div className="flex items-center justify-between mb-3 text-xs text-slate-500">
+          <span>
+            {todoProblems.length > 0
+              ? <><span className="text-rose-500 font-semibold">{todoProblems.length}</span> nehotových · <span className="text-emerald-600 font-semibold">{allTopicProblems.length - todoProblems.length}</span> správně</>
+              : <span className="text-emerald-600 font-semibold">Vše správně zodpovězeno!</span>
+            }
+          </span>
+          <button
+            onClick={() => { setShowAll(v => !v); setIdx(0); reset(); }}
+            className="px-3 py-1 rounded-full border border-slate-200 hover:border-indigo-300 bg-white transition-colors"
+          >
+            {showAll ? 'Jen nehotové' : 'Zobrazit vše'}
+          </button>
+        </div>
+      )}
 
       {/* Source */}
       <p className="text-xs text-slate-400 mb-3 text-center">
@@ -287,7 +368,10 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
                 onClick={() => {
                   const next = new Set([...revealedParts, i]);
                   setRevealedParts(next);
-                  if (next.size >= answerParts.length) saveAttempt(problem.id, false); // open = self-assessed
+                  if (next.size >= answerParts.length) {
+                    saveAttempt(problem.id, false);
+                    setRev(r => r + 1);
+                  }
                 }}
                 className="w-full py-3 border-2 border-indigo-200 hover:border-indigo-400 bg-white
                   text-indigo-600 font-medium rounded-xl transition-colors text-sm">
@@ -346,14 +430,14 @@ export default function Practice({ config, startIdx, onBack, onProgress }: {
           )}
           <button onClick={advance}
             className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors">
-            {idx + 1 < problems.length ? 'Další příklad →' : 'Dokončit ✓'}
+            {safeIdx + 1 < problems.length ? 'Další příklad →' : 'Dokončit ✓'}
           </button>
         </div>
       )}
 
       {/* Prev / skip */}
       <div className="flex justify-between text-sm text-slate-400 mt-auto pt-2">
-        <button onClick={goBack} disabled={idx === 0}
+        <button onClick={goBack} disabled={safeIdx === 0}
           className="hover:text-slate-600 disabled:opacity-30">← Předchozí</button>
         <button onClick={advance} className="hover:text-slate-600">Přeskočit →</button>
       </div>
