@@ -6,12 +6,15 @@ import { Topic } from './types';
 export type Screen = 'home' | 'practice';
 
 export interface PracticeConfig {
-  topic: Topic | null;
+  mode: 'topic' | 'exam';
+  topic: Topic | null;     // topic mode
+  examYear?: number;        // exam mode
+  examTerm?: string;        // exam mode
 }
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
-  const [config, setConfig] = useState<PracticeConfig>({ topic: null });
+  const [config, setConfig] = useState<PracticeConfig>({ mode: 'topic', topic: null });
 
   function startPractice(cfg: PracticeConfig) {
     setConfig(cfg);

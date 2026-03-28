@@ -27,10 +27,12 @@ function full(srcFile, destName) {
 }
 
 // ── crops ──────────────────────────────────────────────────────────────────
-// test-02: probs 1, 2, 3  (separators at y=196,485,955)
-const p1_img  = crop(`${SRC}/test-02.png`, '2025-C-01.png', 0,   0, W,  196);
-const p2_img  = crop(`${SRC}/test-02.png`, '2025-C-02.png', 0, 196, W,  289); // 485-196
-const p3_img  = crop(`${SRC}/test-02.png`, '2025-C-03.png', 0, 485, W, 1854); // to end
+// test-02: probs 1, 2, 3
+// y=196 is separator after instruction line (prob 1 starts after it).
+// y=485 is between prob 1 and prob 2.  y=955 is between prob 2 and prob 3.
+const p1_img  = crop(`${SRC}/test-02.png`, '2025-C-01.png', 0,   0, W,  485);  // instruction + prob 1 (0→485)
+const p2_img  = crop(`${SRC}/test-02.png`, '2025-C-02.png', 0, 485, W,  470);  // prob 2 (485→955)
+const p3_img  = crop(`${SRC}/test-02.png`, '2025-C-03.png', 0, 955, W, 1384);  // prob 3 (955→end)
 
 // test-03: probs 4, 5  (separator at y=1076)
 const p4_img  = crop(`${SRC}/test-03.png`, '2025-C-04.png', 0,    0, W, 1076);
@@ -56,14 +58,20 @@ const p11_img = crop(`${SRC}/test-08.png`, '2025-C-11.png', 0, 0, W, 1500);
 const p12_img = crop(`${SRC}/test-09.png`, '2025-C-12.png', 0,    0, W, 1167);
 const p13_img = crop(`${SRC}/test-09.png`, '2025-C-13.png', 0, 1167, W, 1172);
 
-// test-10: prob 14  (separators y=173,888)
-const p14_img = crop(`${SRC}/test-10.png`, '2025-C-14.png', 0, 0, W, 1100);
+// test-10: prob 14  (separators y=173,888 — extend to include all MC options A–E)
+const p14_img = crop(`${SRC}/test-10.png`, '2025-C-14.png', 0, 0, W, 1600);
 
 // test-11: prob 15 — matching (no separator detected, crop lower half of page)
 const p15_img = crop(`${SRC}/test-11.png`, '2025-C-15.png', 0, 0, W, 2200);
 
 // test-12: prob 16 + formula sheet (separator at y=1745 before formula)
 const p16_img = crop(`${SRC}/test-12.png`, '2025-C-16.png', 0, 0, W, 1745);
+
+// ── answer images for construction problems (from key PDF) ─────────────────
+const KEY = path.join(__dirname, '..', 'data', 'images', '2025-C');
+// key-3: prob 9 (top, splits [157,822,879,1118]) and prob 10 (bottom, splits at 1175,1773)
+const p9_ans  = crop(`${KEY}/key-3.png`, '2025-C-09-answer.png', 0,    0, W, 1118);  // prob 9 full solution
+const p10_ans = crop(`${KEY}/key-3.png`, '2025-C-10-answer.png', 0, 1118, W, 1221);  // prob 10 (1118→2339)
 
 console.log('Cropped all 2025-C problem images.');
 
@@ -199,6 +207,7 @@ const problems = [
   {
     id: '2025-C-09', year: 2025, term: 'C', problem_number: 9,
     question_image: p9_img,
+    answer_image: p9_ans,
     type: 'open',
     correct_answer: 'Geometrická konstrukce — rovnoramenný trojúhelník ABC se základnou AB (viz řešení)',
     solution_steps: JSON.stringify([
@@ -216,6 +225,7 @@ const problems = [
   {
     id: '2025-C-10', year: 2025, term: 'C', problem_number: 10,
     question_image: p10_img,
+    answer_image: p10_ans,
     type: 'open',
     correct_answer: 'Geometrická konstrukce — obdélník ABCD se dvěma řešeními (viz řešení)',
     solution_steps: JSON.stringify([

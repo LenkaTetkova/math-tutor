@@ -22,12 +22,17 @@ function isMultiMC(p: Problem) {
 
 export default function Practice({ config, onBack }: { config: PracticeConfig; onBack: () => void }) {
   const problems = useMemo<Problem[]>(() => {
+    if (config.mode === 'exam') {
+      return (allProblems as Problem[])
+        .filter(p => p.year === config.examYear && p.term === config.examTerm)
+        .sort((a, b) => a.problem_number - b.problem_number);
+    }
     const filtered = (allProblems as Problem[]).filter(
       p => !config.topic || p.topic === config.topic
     );
     return [...filtered].sort(() => Math.random() - 0.5);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.topic]);
+  }, [config.mode, config.examYear, config.examTerm, config.topic]);
 
   const [idx, setIdx] = useState(0);
   const [done, setDone] = useState(false);
@@ -94,7 +99,7 @@ export default function Practice({ config, onBack }: { config: PracticeConfig; o
         <div className="text-4xl mb-4">🤔</div>
         <p className="text-slate-600 mb-6">Pro toto nastavení nejsou žádné příklady.</p>
         <button onClick={onBack} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium">
-          Zpět na výběr tématu
+          Zpět na výběr
         </button>
       </div>
     );
@@ -112,7 +117,7 @@ export default function Practice({ config, onBack }: { config: PracticeConfig; o
         </p>
         <button onClick={onBack}
           className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors">
-          Zpět na výběr tématu
+          Zpět na výběr
         </button>
       </div>
     );
@@ -140,7 +145,11 @@ export default function Practice({ config, onBack }: { config: PracticeConfig; o
         <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
           {TOPIC_EMOJI[problem.topic]} {TOPIC_LABELS[problem.topic]}
         </span>
-        <span className="text-sm text-slate-400">{idx + 1} / {problems.length}</span>
+        <span className="text-sm text-slate-400">
+        {config.mode === 'exam'
+          ? `Úloha ${problem.problem_number} / ${problems.length}`
+          : `${idx + 1} / ${problems.length}`}
+      </span>
       </div>
 
       {/* Source */}

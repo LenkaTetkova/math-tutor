@@ -27,10 +27,12 @@ function full(srcFile, destName) {
 }
 
 // ── crops ──────────────────────────────────────────────────────────────────
-// test-02: probs 1, 2, 3  (separators at y=250,397,711,1171)
-const p1_img  = crop(`${SRC}/test-02.png`, '2025-B-01.png', 0,   0, W,  397);
-const p2_img  = crop(`${SRC}/test-02.png`, '2025-B-02.png', 0, 397, W,  314); // 711-397
-const p3_img  = crop(`${SRC}/test-02.png`, '2025-B-03.png', 0, 711, W, 1628); // to page end
+// test-02: probs 1, 2, 3
+// Separators at y=250,397 are VÝCHOZÍ TEXT box borders (within prob 1).
+// Real problem boundaries: y=711 (1→2), y=1171 (2→3).
+const p1_img  = crop(`${SRC}/test-02.png`, '2025-B-01.png', 0,    0, W,  711);  // instruction + context + prob 1
+const p2_img  = crop(`${SRC}/test-02.png`, '2025-B-02.png', 0,  711, W,  460);  // prob 2 (711→1171)
+const p3_img  = crop(`${SRC}/test-02.png`, '2025-B-03.png', 0, 1171, W, 1168);  // prob 3 (1171→end)
 
 // test-03: probs 4, 5  (separator at y=1000)
 const p4_img  = crop(`${SRC}/test-03.png`, '2025-B-04.png', 0,    0, W, 1000);
@@ -64,6 +66,13 @@ const p15_img = crop(`${SRC}/test-11.png`, '2025-B-15.png', 0, 0, W, 1700);
 
 // test-12: prob 16 + formula sheet (separator at y=1726 before formula)
 const p16_img = crop(`${SRC}/test-12.png`, '2025-B-16.png', 0, 0, W, 1726);
+
+// ── answer images for construction problems (from key PDF) ─────────────────
+const KEY = path.join(__dirname, '..', 'data', 'images', '2025-B');
+// key-3: prob 9 construction solution (splits [157,759,935,1206,1318])
+const p9_ans  = crop(`${KEY}/key-3.png`, '2025-B-09-answer.png', 0,   0, W, 935);
+// key-4: prob 10 construction solution (splits [157,764,908,...])
+const p10_ans = crop(`${KEY}/key-4.png`, '2025-B-10-answer.png', 0,   0, W, 908);
 
 console.log('Cropped all 2025-B problem images.');
 
@@ -202,6 +211,7 @@ const problems = [
   {
     id: '2025-B-09', year: 2025, term: 'B', problem_number: 9,
     question_image: p9_img,
+    answer_image: p9_ans,
     type: 'open',
     correct_answer: 'Geometrická konstrukce — dva vrcholy C rovnoramenného trojúhelníku ABC (viz řešení)',
     solution_steps: JSON.stringify([
@@ -219,6 +229,7 @@ const problems = [
   {
     id: '2025-B-10', year: 2025, term: 'B', problem_number: 10,
     question_image: p10_img,
+    answer_image: p10_ans,
     type: 'open',
     correct_answer: 'Geometrická konstrukce — rovnoběžník ABCD s vrcholy B, C (viz řešení)',
     solution_steps: JSON.stringify([
